@@ -50,6 +50,12 @@ export async function crawlFrameworkPkgs(options) {
   /** @type {string[]} */
   let ssrExternal = []
 
+  // The crawl reaches the same package through many parents. Look each one up once.
+  /** @type {Map<string, Promise<string | undefined>>} */
+  const depPkgJsonPaths = new Map()
+  /** @type {Map<string, Promise<Record<string, any> | undefined>>} */
+  const depPkgJsons = new Map()
+
   await crawl(pkgJsonPath, pkgJson)
 
   // respect vite user config
@@ -156,9 +162,13 @@ export async function crawlFrameworkPkgs(options) {
     })
 
     const promises = deps.map(async (dep) => {
-      const depPkgJsonPath = await _findDepPkgJsonPath(dep, pkgJsonPath, !!options.workspaceRoot)
+      const depPkgJsonPath = await once(depPkgJsonPaths, `${dep}\0${pkgJsonPath}`, () =>
+        _findDepPkgJsonPath(dep, pkgJsonPath, !!options.workspaceRoot)
+      )
       if (!depPkgJsonPath) return
-      const depPkgJson = await readJson(depPkgJsonPath).catch(() => {})
+      const depPkgJson = await once(depPkgJsons, depPkgJsonPath, () =>
+        readJson(depPkgJsonPath).catch(() => {})
+      )
       if (!depPkgJson) return
 
       // fast path if this dep is already a framework dep based on the filter condition above
@@ -201,6 +211,23 @@ export async function crawlFrameworkPkgs(options) {
     await Promise.all(promises)
   }
 }
+
+/**
+ * @template T
+ * @param {Map<string, Promise<T>>} cache
+ * @param {string} key
+ * @param {() => Promise<T>} load
+ * @returns {Promise<T>}
+ */
+function once(cache, key, load) {
+  let value = cache.get(key)
+  if (!value) {
+    value = load()
+    cache.set(key, value)
+  }
+  return value
+}
+
 /** @type {import('./index.d.ts').findDepPkgJsonPath} */
 export async function findDepPkgJsonPath(dep, parent) {
   return _findDepPkgJsonPath(dep, parent, false);
