@@ -52,9 +52,9 @@ export async function crawlFrameworkPkgs(options) {
 
   // The crawl reaches the same package through many parents. Look each one up once.
   /** @type {Map<string, Promise<string | undefined>>} */
-  const depPkgJsonPaths = new Map()
+  const depPkgJsonPathsCache = new Map()
   /** @type {Map<string, Promise<Record<string, any> | undefined>>} */
-  const depPkgJsons = new Map()
+  const depPkgJsonsCache = new Map()
 
   await crawl(pkgJsonPath, pkgJson)
 
@@ -162,11 +162,11 @@ export async function crawlFrameworkPkgs(options) {
     })
 
     const promises = deps.map(async (dep) => {
-      const depPkgJsonPath = await once(depPkgJsonPaths, `${dep}\0${pkgJsonPath}`, () =>
+      const depPkgJsonPath = await once(depPkgJsonPathsCache, `${dep}\0${pkgJsonPath}`, () =>
         _findDepPkgJsonPath(dep, pkgJsonPath, !!options.workspaceRoot)
       )
       if (!depPkgJsonPath) return
-      const depPkgJson = await once(depPkgJsons, depPkgJsonPath, () =>
+      const depPkgJson = await once(depPkgJsonsCache, depPkgJsonPath, () =>
         readJson(depPkgJsonPath).catch(() => {})
       )
       if (!depPkgJson) return
@@ -220,12 +220,14 @@ export async function crawlFrameworkPkgs(options) {
  * @returns {Promise<T>}
  */
 function once(cache, key, load) {
-  let value = cache.get(key)
-  if (!value) {
-    value = load()
+  if (cache.has(key)) {
+    /** @ts-expect-error already checked */
+    return cache.get(key)
+  } else {
+    const value = load()
     cache.set(key, value)
+    return value
   }
-  return value
 }
 
 /** @type {import('./index.d.ts').findDepPkgJsonPath} */
