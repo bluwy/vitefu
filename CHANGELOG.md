@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.4 (2026-11-17)
+
+- Improve `crawlFrameworkPkgs` performance when crawling deeply nested Svelte dependencies ([#31](https://github.com/svitejs/vitefu/pull/31))
+
 ## 1.1.3 (2026-04-01)
 
 - Sort result arrays of `crawlFrameworkPkgs` to ensure they are deterministic ([#30](https://github.com/svitejs/vitefu/pull/30))
